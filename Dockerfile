@@ -1,55 +1,84 @@
-FROM node:20-bullseye
+# =========================================
+# Dockerfile (Opção A) — Base Node + Python em venv
+# Resolve PEP 668 (externally-managed-environment)
+# =========================================
 
-# ===============================
-# Dependências de sistema
-# ===============================
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+# -------------------------
+# Dependências do sistema
+# - python3 + venv para instalar libs do seu leitor (pdfplumber etc)
+# - libs comuns que o pdfplumber/pillow podem precisar
+# -------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-venv \
     python3-pip \
-    chromium \
-    chromium-driver \
-    fonts-liberation \
+    ca-certificates \
+    curl \
+    git \
+    build-essential \
+    libmagic1 \
+    libglib2.0-0 \
     libnss3 \
+    libnspr4 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
     libxkbcommon0 \
-    libgtk-3-0 \
-    libasound2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
     libgbm1 \
-    libxshmfence1 \
- && rm -rf /var/lib/apt/lists/*
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libjpeg62-turbo \
+    libpng16-16 \
+    libfreetype6 \
+    fonts-liberation \
+  && rm -rf /var/lib/apt/lists/*
 
-# ===============================
-# Python virtualenv
-# ===============================
+# -------------------------
+# Python venv (PEP 668 safe)
+# -------------------------
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# ===============================
-# Python deps
-# ===============================
-COPY requirements.txt ./requirements.txt
+# -------------------------
+# Instala dependências Python no venv
+# (mantém cache eficiente: requirements antes do código)
+# -------------------------
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ===============================
-# Node deps
-# ===============================
-WORKDIR /app
+# -------------------------
+# Instala dependências Node
+# -------------------------
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
-# ===============================
-# Código
-# ===============================
+# Playwright browsers (se você usa Playwright no Node)
+# Importante: isso baixa os browsers dentro da imagem
+RUN npx playwright install --with-deps chromium
+
+# -------------------------
+# Copia o restante do projeto
+# -------------------------
 COPY . .
 
-# ===============================
-# Playwright
-# ===============================
-RUN npx playwright install chromium
+# -------------------------
+# Variáveis padrão (opcional)
+# -------------------------
+ENV NODE_ENV=production
+ENV PYTHON_BIN=/opt/venv/bin/python
 
-# ===============================
-# Start
-# ===============================
+# -------------------------
+# Comando principal
+# -------------------------
 CMD ["node", "index.js"]

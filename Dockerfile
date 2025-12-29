@@ -1,28 +1,55 @@
-FROM node:20-bookworm
+FROM node:20-bullseye
 
-# Dependências do Playwright (Chromium)
-RUN npx playwright install-deps chromium
-
-# Python + pip
+# ===============================
+# Dependências de sistema
+# ===============================
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip \
-  && rm -rf /var/lib/apt/lists/*
+    python3 \
+    python3-venv \
+    python3-pip \
+    chromium \
+    chromium-driver \
+    fonts-liberation \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libxkbcommon0 \
+    libgtk-3-0 \
+    libasound2 \
+    libgbm1 \
+    libxshmfence1 \
+ && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# ===============================
+# Python virtualenv
+# ===============================
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Node deps
-COPY package*.json ./
-RUN npm ci
-
+# ===============================
 # Python deps
-COPY requirements.txt ./
-RUN pip3 install --no-cache-dir -r requirements.txt
+# ===============================
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# App
+# ===============================
+# Node deps
+# ===============================
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+# ===============================
+# Código
+# ===============================
 COPY . .
 
-# Playwright browsers (instala o Chromium no container)
+# ===============================
+# Playwright
+# ===============================
 RUN npx playwright install chromium
 
-# Rode o job (node chama o python no final)
+# ===============================
+# Start
+# ===============================
 CMD ["node", "index.js"]
